@@ -2,6 +2,7 @@
 using System.Drawing;
 using System.IO;
 using System.IO.Compression;
+using System.Collections.Generic;
 using ZXing;
 using ZXing.Common;
 using ZXing.PDF417;
@@ -10,7 +11,7 @@ class Program
 {
     static void Main(string[] args)
     {
-       
+        // Input data
         string name = "John Doe";
         string ssn = "123-45-6789";
         string dodId = "1234567890";  // Fake DOD ID number
@@ -61,24 +62,50 @@ class Program
     static Bitmap GeneratePDF417Barcode(byte[] data)
     {
         PDF417Writer pdf417Writer = new PDF417Writer();
-
-        // Specify the character set as UTF-8
         IDictionary<EncodeHintType, object> hints = new Dictionary<EncodeHintType, object>
-    {
-        { EncodeHintType.CHARACTER_SET, "UTF-8" }
-    };
-
-        BitMatrix bitMatrix = pdf417Writer.encode(System.Text.Encoding.UTF8.GetString(data), BarcodeFormat.PDF_417, 500, 500, hints);
-        Bitmap barcodeImage = new Bitmap(bitMatrix.Width, bitMatrix.Height);
-        for (int x = 0; x < bitMatrix.Width; x++)
         {
-            for (int y = 0; y < bitMatrix.Height; y++)
+            { EncodeHintType.CHARACTER_SET, "UTF-8" }
+        };
+
+        // Determine number of rows based on data length
+        int numRows = data.Length / 40 + 1;
+
+        // Generate each row of the barcode and concatenate
+        Bitmap barcodeImage = null;
+        for (int i = 0; i < numRows; i++)
+        {
+            string rowData = System.Text.Encoding.UTF8.GetString(data, i * 40, Math.Min(40, data.Length - i * 40));
+            BitMatrix bitMatrix = pdf417Writer.encode(rowData, BarcodeFormat.PDF_417, 500, 500, hints);
+            Bitmap rowImage = new Bitmap(bitMatrix.Width, bitMatrix.Height);
+            for (int x = 0; x < bitMatrix.Width; x++)
             {
-                barcodeImage.SetPixel(x, y, bitMatrix[x, y] ? Color.Black : Color.White);
+                for (int y = 0; y < bitMatrix.Height; y++)
+                {
+                    rowImage.SetPixel(x, y, bitMatrix[x, y] ? Color.Black : Color.White);
+                }
+            }
+
+            // Concatenate row images
+            if (barcodeImage == null)
+            {
+                barcodeImage = rowImage;
+            }
+            else
+            {
+                barcodeImage = ConcatenateImages(barcodeImage, rowImage);
             }
         }
         return barcodeImage;
     }
 
-
+    static Bitmap ConcatenateImages(Bitmap image1, Bitmap image2)
+    {
+        Bitmap combinedImage = new Bitmap(image1.Width, image1.Height + image2.Height);
+        using (Graphics g = Graphics.FromImage(combinedImage))
+        {
+            g.DrawImage(image1, 0, 0);
+            g.DrawImage(image2, 0, image1.Height);
+        }
+        return combinedImage;
+    }
 }
